@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CertChain — Audit Logs</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#080b18;color:#eef1ff;font-family:Inter,Segoe UI,Arial,sans-serif}
+button{font-family:inherit}
+.layout{display:flex;min-height:100vh}
+.sidebar{width:245px;background:#0d1123;border-right:1px solid rgba(255,255,255,.07);padding:22px 14px;position:fixed;top:0;bottom:0}
+.brand{font-size:20px;font-weight:800;padding:8px 12px 28px}
+.brand span{color:#7665ff}
+.nav{display:flex;flex-direction:column;gap:7px}
+.nav button{border:0;background:transparent;color:#aeb6d2;text-align:left;padding:12px 14px;border-radius:10px;cursor:pointer;font-size:14px}
+.nav button:hover,.nav button.active{background:rgba(103,87,255,.14);color:#fff}
+.logout{position:absolute;left:14px;right:14px;bottom:20px;border:1px solid rgba(255,255,255,.08)!important;background:rgba(255,255,255,.025)!important;color:#ff7585!important}
+.main{margin-left:245px;width:calc(100% - 245px);padding:38px 44px}
+.header{display:flex;justify-content:space-between;align-items:center;gap:20px;margin-bottom:28px}
+.header h1{margin:0;font-size:30px}.header p{margin:7px 0 0;color:#8f98b8}
+.back{border:0;background:#6757ff;color:#fff;padding:11px 17px;border-radius:10px;cursor:pointer;font-weight:600}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px}
+.stat{background:#11162b;border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:18px}
+.stat-label{color:#8992b2;font-size:12px}.stat-value{font-size:27px;font-weight:800;margin-top:7px}
+.panel{background:#11162b;border:1px solid rgba(255,255,255,.07);border-radius:16px;padding:20px;margin-bottom:20px}
+.panel-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.panel-head h2{margin:0;font-size:17px}
+.badge{font-size:11px;padding:6px 9px;border-radius:999px;background:rgba(103,87,255,.13);color:#aaa2ff}
+.table-wrap{overflow:auto}
+table{width:100%;border-collapse:collapse;min-width:800px}
+th,td{padding:13px 12px;border-bottom:1px solid rgba(255,255,255,.06);text-align:left;font-size:12px;vertical-align:top}
+th{color:#8d96b5;font-weight:600}.muted{color:#8f98b8}
+.action{font-weight:700;color:#9d93ff}.login{color:#45e6a5}.revoke{color:#ff7585}.verify{color:#5db5ff}.system{color:#f3c86b}
+.desc{max-width:440px;color:#c6cbe0;line-height:1.4}
+.empty,.error,.loading{text-align:center;padding:30px;color:#8e96b5}.error{color:#ff7585}
+@media(max-width:900px){.sidebar{width:200px}.main{margin-left:200px;width:calc(100% - 200px);padding:25px}.stats{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:650px){.sidebar{position:static;width:100%;min-height:auto}.layout{display:block}.main{margin-left:0;width:100%}.stats{grid-template-columns:1fr}.logout{position:static;margin-top:20px}}
+</style>
+</head>
+<body>
+<div class="layout">
+<aside class="sidebar">
+  <div class="brand">⛓️ <span>Cert</span>Chain</div>
+  <div class="nav">
+    <button onclick="window.location.href='admin.html'">📊 Dashboard</button>
+    <button onclick="window.location.href='admin.html'">👨‍🎓 Students</button>
+    <button onclick="window.location.href='admin.html'">🏛️ Institutions</button>
+    <button onclick="window.location.href='certificates.html'">📜 Certificates</button>
+    <button class="active">📋 Audit Logs</button>
+  </div>
+  <button class="nav logout" onclick="logout()">🚪 Logout</button>
+</aside>
+
+<main class="main">
+  <div class="header">
+    <div>
+      <h1>Audit Logs</h1>
+      <p>Security activity and certificate verification history</p>
+    </div>
+    <button class="back" onclick="window.location.href='admin.html'">← Dashboard</button>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="stat-label">Database Audit Logs</div><div id="auditCount" class="stat-value">—</div></div>
+    <div class="stat"><div class="stat-label">Verification Events</div><div id="verificationCount" class="stat-value">—</div></div>
+    <div class="stat"><div class="stat-label">Admin Logins</div><div id="loginCount" class="stat-value">—</div></div>
+    <div class="stat"><div class="stat-label">Revocations</div><div id="revokeCount" class="stat-value">—</div></div>
+  </div>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>🔐 System Audit Trail</h2>
+      <span class="badge">Latest 100</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Time</th><th>User</th><th>Action</th><th>Description</th><th>IP Address</th></tr></thead>
+        <tbody id="auditBody"><tr><td colspan="5" class="loading">Loading audit logs...</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>🛡️ Verification Activity</h2>
+      <span class="badge">Latest events</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Time</th><th>Category</th><th>Verdict</th><th>Tampered Components</th></tr></thead>
+        <tbody id="verificationBody"><tr><td colspan="4" class="loading">Loading verification activity...</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+</div>
+
+<script>
+const API_BASE="http://127.0.0.1:8000";
+const token=localStorage.getItem("certchain_token");
+const headers={Authorization:"Bearer "+token};
+
+function esc(value){
+ return String(value??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
+}
+function fmt(value){
+ if(!value)return "—";
+ const d=new Date(value);
+ return Number.isNaN(d.getTime())?String(value):d.toLocaleString();
+}
+function actionClass(action){
+ const a=String(action||"").toUpperCase();
+ if(a.includes("LOGIN"))return "login";
+ if(a.includes("REVOK"))return "revoke";
+ if(a.includes("VERIFY"))return "verify";
+ return "system";
+}
+function categoryLabel(category){
+ const map={authentic:"AUTHENTIC",forged:"FORGED",wrong_details:"WRONG DETAILS",revoked:"REVOKED",invalid:"INVALID"};
+ return map[category]||String(category||"INVALID").toUpperCase();
+}
+
+async function loadAudit(){
+ const body=document.getElementById("auditBody");
+ try{
+  const r=await fetch(API_BASE+"/admin/audit-logs",{headers});
+  if(r.status===401||r.status===403){logout();return;}
+  if(!r.ok)throw new Error("Could not load audit logs.");
+  const logs=await r.json();
+  document.getElementById("auditCount").textContent=logs.length;
+  document.getElementById("loginCount").textContent=logs.filter(x=>String(x.action).toUpperCase().includes("LOGIN")).length;
+  document.getElementById("revokeCount").textContent=logs.filter(x=>String(x.action).toUpperCase().includes("REVOK")).length;
+
+  if(!logs.length){
+   body.innerHTML='<tr><td colspan="5" class="empty">No database audit events recorded yet.</td></tr>';
+   return;
+  }
+  body.innerHTML=logs.map(log=>`
+   <tr>
+    <td>${esc(fmt(log.created_at))}</td>
+    <td>${esc(log.username)}</td>
+    <td class="action ${actionClass(log.action)}">${esc(log.action)}</td>
+    <td class="desc">${esc(log.description)}</td>
+    <td class="muted">${esc(log.ip_address||"—")}</td>
+   </tr>`).join("");
+ }catch(e){
+  body.innerHTML=`<tr><td colspan="5" class="error">${esc(e.message)}</td></tr>`;
+ }
+}
+
+async function loadVerification(){
+ const body=document.getElementById("verificationBody");
+ try{
+  const r=await fetch(API_BASE+"/admin/verification-analytics",{headers});
+  if(r.status===401||r.status===403){logout();return;}
+  if(!r.ok)throw new Error("Could not load verification activity.");
+  const data=await r.json();
+  const events=data.recent_events||[];
+  document.getElementById("verificationCount").textContent=data.statistics?.total??0;
+
+  if(!events.length){
+   body.innerHTML='<tr><td colspan="4" class="empty">No verification events recorded yet.</td></tr>';
+   return;
+  }
+  body.innerHTML=events.map(event=>`
+   <tr>
+    <td>${esc(fmt(event.timestamp))}</td>
+    <td class="action ${event.category==="forged"?"revoke":event.category==="authentic"?"login":"verify"}">${esc(categoryLabel(event.category))}</td>
+    <td>${esc(event.verdict||"—")}</td>
+    <td class="muted">${esc((event.tampered_components||[]).join(", ")||"None detected")}</td>
+   </tr>`).join("");
+ }catch(e){
+  body.innerHTML=`<tr><td colspan="4" class="error">${esc(e.message)}</td></tr>`;
+ }
+}
+
+function logout(){
+ localStorage.removeItem("certchain_token");
+ window.location.href="index.html";
+}
+
+(async()=>{
+ if(!token){logout();return;}
+ try{
+  const r=await fetch(API_BASE+"/me",{headers});
+  if(!r.ok){logout();return;}
+  const me=await r.json();
+  if(me.role!=="admin"){logout();return;}
+  await Promise.all([loadAudit(),loadVerification()]);
+ }catch(e){logout();}
+})();
+</script>
+</body>
+</html>

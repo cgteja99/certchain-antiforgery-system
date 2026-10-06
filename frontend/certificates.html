@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CertChain — Certificate Registry</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Inter,Arial,sans-serif;background:#080b18;color:#f5f7ff;min-height:100vh}
+.layout{display:flex;min-height:100vh}
+.sidebar{width:250px;background:#10142a;border-right:1px solid rgba(255,255,255,.08);padding:25px 18px;display:flex;flex-direction:column}
+.brand{display:flex;align-items:center;gap:12px;padding:10px;margin-bottom:35px}
+.brand-icon{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(135deg,#5b8cff,#8b4dff);font-size:21px}
+.brand h2{font-size:20px}.brand span{display:block;font-size:10px;color:#8d95b2;margin-top:3px}
+.menu{display:flex;flex-direction:column;gap:8px}.menu button{border:none;background:transparent;color:#9ca4c4;text-align:left;padding:13px 14px;border-radius:10px;cursor:pointer;font-size:14px}
+.menu button:hover,.menu button.active{background:rgba(103,87,255,.16);color:white}
+.logout{margin-top:auto}.logout button{width:100%;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03);color:#ff8e9b;padding:12px;border-radius:10px;cursor:pointer}
+.main{flex:1;padding:35px;overflow-x:hidden}.topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:25px}
+.topbar h1{font-size:30px}.topbar p{color:#8e96b5;margin-top:6px;font-size:14px}
+.admin-user{display:flex;align-items:center;gap:12px;padding:10px 15px;background:#11162c;border:1px solid rgba(255,255,255,.08);border-radius:12px}
+.avatar{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#6c63ff,#3ec5ff);display:grid;place-items:center;font-weight:bold}
+.admin-user small{color:#7f88a8;display:block}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-bottom:22px}
+.card,.panel{background:#11162c;border:1px solid rgba(255,255,255,.08);border-radius:16px;box-shadow:0 15px 40px rgba(0,0,0,.18)}
+.card{padding:20px}.card-label{color:#8e96b5;font-size:13px;margin-bottom:10px}.card-value{font-size:28px;font-weight:700}
+.panel{padding:24px}.panel-head{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-bottom:18px}.panel-head h2{font-size:19px}
+.back-btn{border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);color:#f5f7ff;padding:9px 14px;border-radius:9px;cursor:pointer}
+.table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;min-width:900px}
+th,td{padding:14px 12px;text-align:left;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px}
+th{color:#8e96b5;font-weight:600}td{color:#e7eaff}tr:hover td{background:rgba(255,255,255,.025)}
+.status{display:inline-block;padding:5px 9px;border-radius:999px;font-size:11px;font-weight:700}
+.active-status{color:#48e0ad;background:rgba(72,224,173,.1)}.revoked-status{color:#ff7585;background:rgba(255,117,133,.1)}
+.chain-status{color:#70b7ff;background:rgba(112,183,255,.1)}
+.hash{max-width:145px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#9fa8c9;font-family:Consolas,monospace;font-size:11px}
+.registry-tools{display:flex;flex-direction:column;gap:13px;margin-bottom:20px}
+.search-box{display:flex;align-items:center;gap:10px;background:#0c1022;border:1px solid rgba(255,255,255,.09);border-radius:11px;padding:0 14px}
+.search-box span{font-size:16px;opacity:.8}
+.search-box input{width:100%;border:0;outline:0;background:transparent;color:#f5f7ff;padding:13px 4px;font-size:14px}
+.search-box input::placeholder{color:#737c9d}
+.filter-row{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.filter-btn{border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.035);color:#9ca4c4;padding:8px 14px;border-radius:9px;cursor:pointer;font-size:12px;font-weight:600}
+.filter-btn:hover,.filter-btn.active{background:rgba(103,87,255,.18);border-color:rgba(126,111,255,.45);color:#fff}
+.result-count{margin-left:auto;color:#7f88a8;font-size:12px}
+.loading,.error,.empty{padding:35px;text-align:center;color:#8e96b5}.error{color:#ff7585}
+.certificate-row{cursor:pointer;transition:background .18s,transform .18s}
+.certificate-row:hover{background:rgba(103,87,255,.07)}
+.detail-modal{position:fixed;inset:0;background:rgba(2,4,14,.78);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center;padding:24px;z-index:1000}
+.detail-modal.show{display:flex}
+.detail-card{width:min(760px,100%);max-height:90vh;overflow:auto;background:#11162b;border:1px solid rgba(255,255,255,.10);border-radius:18px;box-shadow:0 24px 80px rgba(0,0,0,.45)}
+.detail-head{display:flex;justify-content:space-between;align-items:center;padding:22px 24px;border-bottom:1px solid rgba(255,255,255,.08)}
+.detail-head h2{margin:0;color:#fff;font-size:20px}
+.close-btn{border:0;background:rgba(255,255,255,.07);color:#cbd1e7;width:36px;height:36px;border-radius:9px;cursor:pointer;font-size:20px}
+.close-btn:hover{background:rgba(255,255,255,.12)}
+.detail-body{padding:22px 24px}
+.detail-status{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:14px 16px;border-radius:12px;background:#0b1021;margin-bottom:18px}
+.detail-status-label{color:#8f98b8;font-size:12px}
+.detail-status-value{font-weight:700;font-size:13px}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.detail-item{background:#0b1021;border:1px solid rgba(255,255,255,.06);border-radius:11px;padding:13px}
+.detail-item.full{grid-column:1/-1}
+.detail-label{display:block;color:#7f89aa;font-size:11px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:7px}
+.detail-value{color:#eef1ff;font-size:13px;line-height:1.45;word-break:break-word}
+.detail-value.mono{font-family:Consolas,monospace;font-size:11px;color:#bfc7e8}
+.detail-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}
+.detail-close-action,.detail-revoke-action,.detail-explorer-action{border:0;color:#fff;padding:10px 18px;border-radius:9px;cursor:pointer;font-weight:600}
+.detail-close-action{background:#6757ff}
+.detail-explorer-action{background:#1687d9}
+.detail-explorer-action:hover{filter:brightness(1.08)}
+.detail-revoke-action{background:#df4963}
+.detail-revoke-action:hover{filter:brightness(1.08)}
+.detail-revoke-action:disabled{opacity:.65;cursor:not-allowed}
+@media(max-width:650px){.detail-grid{grid-template-columns:1fr}.detail-item.full{grid-column:auto}}
+@media(max-width:900px){.sidebar{width:70px;padding:15px 8px}.brand h2,.brand span,.menu button span,.logout button span{display:none}.brand{justify-content:center}.main{padding:20px}.stats{grid-template-columns:1fr}.topbar{align-items:flex-start;gap:15px}}
+</style>
+</head>
+<body>
+<div class="layout">
+<aside class="sidebar">
+<div class="brand"><div class="brand-icon">⛓</div><div><h2>CertChain</h2><span>ADMIN PANEL</span></div></div>
+<div class="menu">
+<button onclick="window.location.href='admin.html'">📊 <span>Dashboard</span></button>
+<button onclick="window.location.href='admin.html'">🎓 <span>Students</span></button>
+<button onclick="window.location.href='admin.html'">🏫 <span>Institutions</span></button>
+<button class="active">📜 <span>Certificates</span></button>
+<button onclick="window.location.href='admin.html'">📋 <span>Audit Logs</span></button>
+</div>
+<div class="logout"><button onclick="logout()">🚪 <span>Logout</span></button></div>
+</aside>
+
+<main class="main">
+<div class="topbar">
+<div><h1>Certificate Registry</h1><p>All certificates registered in CertChain</p></div>
+<div class="admin-user"><div class="avatar" id="avatar">A</div><div><strong id="adminName">Loading...</strong><small>Administrator</small></div></div>
+</div>
+
+<div class="stats">
+<div class="card"><div class="card-label">Total Certificates</div><div class="card-value" id="totalCertificates">—</div></div>
+<div class="card"><div class="card-label">Active</div><div class="card-value" id="activeCertificates">—</div></div>
+<div class="card"><div class="card-label">Revoked</div><div class="card-value" id="revokedCertificates">—</div></div>
+</div>
+
+<section class="panel">
+<div class="panel-head"><h2>📜 Registered Certificates</h2><button class="back-btn" onclick="window.location.href='admin.html'">← Dashboard</button></div>
+
+<div class="registry-tools">
+<div class="search-box">
+  <span>🔎</span>
+  <input id="certificateSearch" type="search" placeholder="Search Student ID, name, course or certificate hash..." oninput="applyFilters()">
+</div>
+<div class="filter-row">
+  <button class="filter-btn active" data-filter="all" onclick="setFilter('all')">All</button>
+  <button class="filter-btn" data-filter="active" onclick="setFilter('active')">Active</button>
+  <button class="filter-btn" data-filter="revoked" onclick="setFilter('revoked')">Revoked</button>
+  <button class="filter-btn" data-filter="onchain" onclick="setFilter('onchain')">On-Chain</button>
+  <span class="result-count" id="resultCount">0 certificates</span>
+</div>
+</div>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>Certificate ID</th><th>Student ID</th><th>Student Name</th><th>Course</th><th>Blockchain</th><th>Status</th><th>Issued</th><th>Certificate Hash</th></tr></thead>
+<tbody id="certificateTableBody"><tr><td colspan="8" class="loading">Loading certificates...</td></tr></tbody>
+</table>
+</div>
+</section>
+</main>
+</div>
+
+<script>
+const API_BASE="http://127.0.0.1:8000";
+const token=localStorage.getItem("certchain_token");
+
+if(!token){
+ alert("Please login as administrator.");
+ window.location.href="login.html";
+}
+
+const headers={"Authorization":"Bearer "+token,"Content-Type":"application/json"};
+
+function logout(){
+ localStorage.removeItem("certchain_token");
+ window.location.href="index.html";
+}
+
+function shorten(value,length=24){
+ if(!value)return "—";
+ if(value.length<=length)return value;
+ return value.slice(0,12)+"…"+value.slice(-10);
+}
+
+let allCertificates=[];
+let currentFilter="all";
+
+function escapeHtml(value){
+ const text=String(value??"");
+ return text.replace(/[&<>"']/g,char=>({
+  "&":"&amp;",
+  "<":"&lt;",
+  ">":"&gt;",
+  '"':"&quot;",
+  "'":"&#039;"
+ }[char]));
+}
+
+function setFilter(filter){
+ currentFilter=filter;
+ document.querySelectorAll(".filter-btn").forEach(button=>{
+  button.classList.toggle("active",button.dataset.filter===filter);
+ });
+ applyFilters();
+}
+
+function applyFilters(){
+ const table=document.getElementById("certificateTableBody");
+ const query=(document.getElementById("certificateSearch").value||"").trim().toLowerCase();
+
+ const filtered=allCertificates.filter(cert=>{
+  const searchable=[
+   cert.student_id,
+   cert.student_name,
+   cert.course,
+   cert.certificate_hash
+  ].map(value=>String(value??"").toLowerCase()).join(" ");
+
+  const matchesSearch=!query || searchable.includes(query);
+
+  let matchesFilter=true;
+  if(currentFilter==="active") matchesFilter=!cert.revoked;
+  if(currentFilter==="revoked") matchesFilter=!!cert.revoked;
+  if(currentFilter==="onchain") matchesFilter=!!cert.transaction_hash;
+
+  return matchesSearch && matchesFilter;
+ });
+
+ document.getElementById("resultCount").textContent=
+  `${filtered.length} certificate${filtered.length===1?"":"s"}`;
+
+ if(!filtered.length){
+  table.innerHTML='<tr><td colspan="8" class="empty">No certificates match your search or filter.</td></tr>';
+  return;
+ }
+
+ table.innerHTML="";
+ filtered.forEach(cert=>{
+  const row=document.createElement("tr");
+  row.className="certificate-row";
+  row.title="Click to view certificate details";
+  row.addEventListener("click",()=>showCertificateDetails(cert.id));
+  const status=cert.revoked
+   ? '<span class="status revoked-status">REVOKED</span>'
+   : '<span class="status active-status">ACTIVE</span>';
+  const blockchain=cert.transaction_hash
+   ? '<span class="status chain-status">✓ ON-CHAIN</span>'
+   : "—";
+
+  row.innerHTML=`
+   <td>${escapeHtml(cert.id??"—")}</td>
+   <td>${escapeHtml(cert.student_id??"—")}</td>
+   <td>${escapeHtml(cert.student_name??"—")}</td>
+   <td>${escapeHtml(cert.course??"—")}</td>
+   <td>${blockchain}</td>
+   <td>${status}</td>
+   <td>${cert.created_at?new Date(cert.created_at).toLocaleDateString():"—"}</td>
+   <td class="hash" title="${escapeHtml(cert.certificate_hash||"")}">${escapeHtml(shorten(cert.certificate_hash))}</td>
+  `;
+  table.appendChild(row);
+ });
+}
+
+
+function formatDate(value){
+ if(!value)return "—";
+ const date=new Date(value);
+ return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString();
+}
+
+function detailItem(label,value,full=false,mono=false){
+ return `<div class="detail-item${full?" full":""}">
+   <span class="detail-label">${escapeHtml(label)}</span>
+   <span class="detail-value${mono?" mono":""}">${escapeHtml(value??"—")}</span>
+ </div>`;
+}
+
+
+let selectedCertificateId=null;
+
+
+function openBlockchainTransaction(){
+ const cert=allCertificates.find(item=>String(item.id)===String(selectedCertificateId));
+ if(!cert || !cert.transaction_hash){
+  alert("No blockchain transaction is available for this certificate.");
+  return;
+ }
+
+ const txHash=String(cert.transaction_hash).trim();
+ const url="https://sepolia.etherscan.io/tx/"+encodeURIComponent(txHash);
+ window.open(url,"_blank","noopener,noreferrer");
+}
+
+async function revokeSelectedCertificate(){
+ const cert=allCertificates.find(item=>String(item.id)===String(selectedCertificateId));
+ if(!cert)return;
+
+ if(cert.revoked){
+  alert("This certificate is already revoked.");
+  return;
+ }
+
+ const confirmed=confirm(
+  `Are you sure you want to revoke this certificate?\n\n`+
+  `Student ID: ${cert.student_id||"—"}\n`+
+  `Certificate Hash: ${cert.certificate_hash||"—"}\n\n`+
+  `This action will revoke the certificate on the blockchain and cannot be undone.`
+ );
+ if(!confirmed)return;
+
+ const button=document.getElementById("detailRevokeButton");
+ button.disabled=true;
+ button.textContent="Revoking...";
+
+ try{
+  const response=await fetch(
+   API_BASE+"/revoke/"+encodeURIComponent(cert.certificate_hash),
+   {method:"POST",headers}
+  );
+
+  let data={};
+  try{data=await response.json();}catch(_){}
+
+  if(!response.ok){
+   throw new Error(data.detail||"Certificate revocation failed.");
+  }
+
+  cert.revoked=true;
+
+  closeCertificateDetails();
+  applyFilters();
+
+  let revokedCount=allCertificates.filter(item=>item.revoked).length;
+  document.getElementById("totalCertificates").textContent=allCertificates.length;
+  document.getElementById("activeCertificates").textContent=allCertificates.length-revokedCount;
+  document.getElementById("revokedCertificates").textContent=revokedCount;
+
+  alert(data.message||"Certificate revoked successfully.");
+ }catch(error){
+  console.error("Revocation error:",error);
+  button.disabled=false;
+  button.textContent="Revoke Certificate";
+  alert(error.message);
+ }
+}
+
+function showCertificateDetails(id){
+ const cert=allCertificates.find(item=>String(item.id)===String(id));
+ if(!cert)return;
+
+ selectedCertificateId=cert.id;
+ const explorerButton=document.getElementById("detailExplorerButton");
+ explorerButton.style.display=cert.transaction_hash ? "inline-block" : "none";
+
+ const revokeButton=document.getElementById("detailRevokeButton");
+ revokeButton.disabled=!!cert.revoked;
+ revokeButton.textContent=cert.revoked ? "Already Revoked" : "Revoke Certificate";
+ revokeButton.style.display=cert.revoked ? "none" : "inline-block";
+
+ const status=document.getElementById("detailStatus");
+ status.textContent=cert.revoked ? "● REVOKED" : "● ACTIVE";
+ status.style.color=cert.revoked ? "#ff6b7a" : "#45e6a5";
+
+ document.getElementById("detailGrid").innerHTML=
+   detailItem("Certificate ID",cert.id)+
+   detailItem("Student ID",cert.student_id)+
+   detailItem("Student Name",cert.student_name)+
+   detailItem("Course",cert.course)+
+   detailItem("Issue Date",formatDate(cert.created_at))+
+   detailItem("Blockchain Status",cert.transaction_hash ? "✓ ON-CHAIN" : "Not recorded")+
+   detailItem("Block Number",cert.block_number ?? "—")+
+   detailItem("Transaction Hash",cert.transaction_hash || "—",true,true)+
+   detailItem("Certificate Hash",cert.certificate_hash || "—",true,true)+
+   detailItem("IPFS CID",cert.ipfs_cid || "—",true,true)+
+   detailItem("Student ID Hash",cert.student_id_hash || "—",true,true);
+
+ document.getElementById("detailModal").classList.add("show");
+ document.body.style.overflow="hidden";
+}
+
+function closeCertificateDetails(){
+ document.getElementById("detailModal").classList.remove("show");
+ document.body.style.overflow="";
+ selectedCertificateId=null;
+}
+
+function closeDetailsOnBackdrop(event){
+ if(event.target.id==="detailModal")closeCertificateDetails();
+}
+
+document.addEventListener("keydown",event=>{
+ if(event.key==="Escape")closeCertificateDetails();
+});
+
+async function loadRegistry(){
+ const table=document.getElementById("certificateTableBody");
+ try{
+  const meResponse=await fetch(API_BASE+"/me",{headers});
+  if(!meResponse.ok)throw new Error("Authentication failed. Please login again.");
+  const me=await meResponse.json();
+  if(me.role!=="admin")throw new Error("Admin access required.");
+
+  document.getElementById("adminName").textContent=me.username;
+  document.getElementById("avatar").textContent=me.username.charAt(0).toUpperCase();
+
+  const response=await fetch(API_BASE+"/admin/certificates",{headers});
+  if(!response.ok)throw new Error("Could not load certificate registry.");
+  allCertificates=await response.json();
+
+  let revoked=0;
+  allCertificates.forEach(cert=>{if(cert.revoked)revoked++;});
+
+  document.getElementById("totalCertificates").textContent=allCertificates.length;
+  document.getElementById("activeCertificates").textContent=allCertificates.length-revoked;
+  document.getElementById("revokedCertificates").textContent=revoked;
+
+  if(!allCertificates.length){
+   table.innerHTML='<tr><td colspan="8" class="empty">No certificates have been registered yet.</td></tr>';
+   document.getElementById("resultCount").textContent="0 certificates";
+   return;
+  }
+
+  applyFilters();
+ }catch(error){
+  console.error("Certificate registry error:",error);
+  table.innerHTML=`<tr><td colspan="8" class="error">${escapeHtml(error.message)}</td></tr>`;
+  document.getElementById("resultCount").textContent="0 certificates";
+ }
+}
+loadRegistry();
+</script>
+
+<div id="detailModal" class="detail-modal" onclick="closeDetailsOnBackdrop(event)">
+  <div class="detail-card">
+    <div class="detail-head">
+      <h2>Certificate Details</h2>
+      <button class="close-btn" onclick="closeCertificateDetails()" aria-label="Close">×</button>
+    </div>
+    <div class="detail-body">
+      <div class="detail-status">
+        <span class="detail-status-label">CURRENT STATUS</span>
+        <span id="detailStatus" class="detail-status-value">—</span>
+      </div>
+      <div id="detailGrid" class="detail-grid"></div>
+      <div class="detail-actions">
+        <button id="detailExplorerButton" class="detail-explorer-action" onclick="openBlockchainTransaction()">⛓️ View on Sepolia</button>
+        <button id="detailRevokeButton" class="detail-revoke-action" onclick="revokeSelectedCertificate()">Revoke Certificate</button>
+        <button class="detail-close-action" onclick="closeCertificateDetails()">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
